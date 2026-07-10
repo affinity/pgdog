@@ -26,6 +26,14 @@ impl Prepare {
             statement,
         })
     }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn statement(&self) -> &str {
+        &self.statement
+    }
 }
 
 #[cfg(test)]

@@ -26,6 +26,7 @@ use super::{
 };
 mod ddl;
 mod delete;
+mod execute;
 mod explain;
 mod plugins;
 mod select;
@@ -382,6 +383,10 @@ impl QueryParser {
             }
 
             Some(NodeEnum::ExplainStmt(ref stmt)) => self.explain(&statement, stmt, context),
+
+            Some(NodeEnum::PrepareStmt(ref stmt)) => Self::prepare_statement(stmt, context),
+
+            Some(NodeEnum::ExecuteStmt(ref stmt)) => Self::execute_prepared(stmt, context),
 
             Some(NodeEnum::DiscardStmt { .. }) => {
                 return Ok(Command::Discard {
