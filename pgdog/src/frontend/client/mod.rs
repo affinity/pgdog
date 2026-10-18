@@ -546,7 +546,9 @@ impl Client {
             let query_engine_done = query_engine.can_disconnect();
 
             // If query engine is idle and we requested shutdown, we're done.
-            if query_engine_done && offline {
+            // With shutdown_drain_clients, the client keeps being served until it
+            // disconnects or shutdown_timeout expires.
+            if query_engine_done && offline && !config().config.general.shutdown_drain_clients {
                 // Send shutdown notification to client.
                 self.stream
                     .send_flush(&ErrorResponse::shutting_down())

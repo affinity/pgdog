@@ -310,6 +310,13 @@ pub struct General {
     #[serde(default = "General::default_shutdown_termination_timeout")]
     pub shutdown_termination_timeout: Option<u64>,
 
+    /// On shutdown, keep serving connected clients until they disconnect or `shutdown_timeout` expires,
+    /// instead of closing each client with a FATAL error as soon as it is between transactions.
+    ///
+    /// _Default:_ `false`
+    #[serde(default = "General::shutdown_drain_clients")]
+    pub shutdown_drain_clients: bool,
+
     /// Broadcast IP address used for multi-instance coordination (e.g., schema cache invalidation across nodes).
     pub broadcast_address: Option<Ipv4Addr>,
 
@@ -952,6 +959,7 @@ impl Default for General {
             tls_client_ca_certificate: Self::tls_client_ca_certificate(),
             shutdown_timeout: Self::default_shutdown_timeout(),
             shutdown_termination_timeout: Self::default_shutdown_termination_timeout(),
+            shutdown_drain_clients: Self::shutdown_drain_clients(),
             broadcast_address: Self::broadcast_address(),
             broadcast_port: Self::broadcast_port(),
             query_log: Self::query_log(),
@@ -1317,6 +1325,10 @@ impl General {
 
     fn resharding_replication_retry_min_delay() -> u64 {
         Self::env_or_default("PGDOG_RESHARDING_REPLICATION_RETRY_MIN_DELAY", 1000)
+    }
+
+    fn shutdown_drain_clients() -> bool {
+        Self::env_bool_or_default("PGDOG_SHUTDOWN_DRAIN_CLIENTS", false)
     }
 
     fn default_shutdown_termination_timeout() -> Option<u64> {
@@ -2120,21 +2132,25 @@ mod tests {
         let _guard = set_env_var("PGDOG_CROSS_SHARD_DISABLED", "yes");
         let _guard = set_env_var("PGDOG_LOG_CONNECTIONS", "false");
         let _guard = set_env_var("PGDOG_LOG_DISCONNECTIONS", "0");
+        let _guard = set_env_var("PGDOG_SHUTDOWN_DRAIN_CLIENTS", "true");
 
         assert!(General::dry_run());
         assert!(General::cross_shard_disabled());
         assert!(!General::log_connections());
         assert!(!General::log_disconnections());
+        assert!(General::shutdown_drain_clients());
 
         let _guard = remove_env_var("PGDOG_DRY_RUN");
         let _guard = remove_env_var("PGDOG_CROSS_SHARD_DISABLED");
         let _guard = remove_env_var("PGDOG_LOG_CONNECTIONS");
         let _guard = remove_env_var("PGDOG_LOG_DISCONNECTIONS");
+        let _guard = remove_env_var("PGDOG_SHUTDOWN_DRAIN_CLIENTS");
 
         assert!(!General::dry_run());
         assert!(!General::cross_shard_disabled());
         assert!(General::log_connections());
         assert!(General::log_disconnections());
+        assert!(!General::shutdown_drain_clients());
     }
 
     #[test]

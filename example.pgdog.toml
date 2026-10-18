@@ -140,6 +140,12 @@ shutdown_timeout = 60_000
 #
 # Default: disabled
 shutdown_termination_timeout = 60_000
+# On shutdown, keep serving connected clients until they disconnect
+# or shutdown_timeout expires, instead of closing each client with
+# a FATAL error as soon as it is between transactions.
+#
+# Default: false
+shutdown_drain_clients = false
 # OpenMetrics server port.
 #
 # If set, enables Prometheus-style metrics exporter.
