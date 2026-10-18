@@ -542,13 +542,14 @@ impl Client {
         loop {
             // Check if we should be shutting down.
             let offline = self.comms.offline();
+            // With shutdown_drain_clients, the client keeps being served until it
+            // disconnects or shutdown_timeout expires.
+            let drain = config().config.general.shutdown_drain_clients;
             // Check that there are no active transactions.
             let query_engine_done = query_engine.can_disconnect();
 
             // If query engine is idle and we requested shutdown, we're done.
-            // With shutdown_drain_clients, the client keeps being served until it
-            // disconnects or shutdown_timeout expires.
-            if query_engine_done && offline && !config().config.general.shutdown_drain_clients {
+            if query_engine_done && offline && !drain {
                 // Send shutdown notification to client.
                 self.stream
                     .send_flush(&ErrorResponse::shutting_down())
@@ -561,7 +562,9 @@ impl Client {
             let cancellation_token = query_engine.cancellation_token();
 
             select! {
-                _ = shutdown.cancelled(), if !offline => {
+                // Waking up cancels a partially buffered request, so a draining client
+                // is not woken up.
+                _ = shutdown.cancelled(), if !offline && !drain => {
                     continue; // Wake up task.
                 }
 

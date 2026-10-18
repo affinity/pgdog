@@ -1,14 +1,67 @@
 use std::time::Duration;
 
-use tokio::time::timeout;
+use tokio::time::{sleep, timeout};
 
 use crate::{
+    config::{config, load_test, set},
     expect_message,
     frontend::comms::comms,
-    net::{ErrorResponse, Parameters},
+    net::{
+        BindComplete, CommandComplete, DataRow, ErrorResponse, Format, Parameters, ParseComplete,
+        ReadyForQuery,
+    },
 };
 
 use super::prelude::*;
+
+async fn spawn_draining_client() -> SpawnedClient {
+    load_test();
+    let mut config = (*config()).clone();
+    config.config.general.shutdown_drain_clients = true;
+    set(config).unwrap();
+
+    SpawnedClient::new(Parameters::default()).await
+}
+
+#[tokio::test]
+async fn test_graceful_shutdown_drain_serves_idle_client() {
+    let mut client = spawn_draining_client().await;
+
+    comms().shutdown();
+
+    client.send(Query::new("SELECT 1")).await;
+    let messages = client.read_until('Z').await;
+    assert!(messages.iter().all(|message| message.code() != 'E'));
+}
+
+#[tokio::test]
+async fn test_graceful_shutdown_drain_keeps_partial_request() {
+    let mut client = spawn_draining_client().await;
+
+    client.send(Parse::named("drain_test", "SELECT $1")).await;
+    sleep(Duration::from_millis(100)).await;
+    comms().shutdown();
+    sleep(Duration::from_millis(100)).await;
+
+    client
+        .send(Bind::new_params(
+            "drain_test",
+            &[Parameter {
+                len: 3,
+                data: "123".into(),
+            }],
+        ))
+        .await;
+    client.send(Execute::new()).await;
+    client.send(Sync).await;
+
+    expect_message!(client.read().await, ParseComplete);
+    expect_message!(client.read().await, BindComplete);
+    let row = expect_message!(client.read().await, DataRow);
+    assert_eq!(row.get::<String>(0, Format::Text), Some("123".into()));
+    expect_message!(client.read().await, CommandComplete);
+    expect_message!(client.read().await, ReadyForQuery);
+}
 
 /// Test that a graceful shutdown sends the "shutting down" error to the client
 /// and the client loop exits.

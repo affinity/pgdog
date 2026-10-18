@@ -117,6 +117,7 @@
         "server_lifetime_jitter": 0,
         "sharding_lookup_cache_size": 67108864,
         "sharding_lookup_timeout": 5000,
+        "shutdown_drain_clients": false,
         "shutdown_termination_timeout": null,
         "shutdown_timeout": 60000,
         "stats_period": 15000,
@@ -1304,6 +1305,11 @@
           "format": "uint64",
           "default": 5000,
           "minimum": 0
+        },
+        "shutdown_drain_clients": {
+          "description": "On shutdown, keep serving connected clients until they disconnect or `shutdown_timeout` expires,\ninstead of closing each client with a FATAL error as soon as it is between transactions.\n\n_Default:_ `false`",
+          "type": "boolean",
+          "default": false
         },
         "shutdown_termination_timeout": {
           "description": "How long to wait for active connections to be forcibly terminated after `shutdown_timeout` expires.\n\n**Note:** If set, PgDog will send `CANCEL` requests to PostgreSQL for any remaining active queries before tearing down connection pools.\n\n<https://docs.pgdog.dev/configuration/pgdog.toml/general/#shutdown_termination_timeout>",
